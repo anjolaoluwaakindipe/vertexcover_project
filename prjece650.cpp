@@ -53,6 +53,7 @@ std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
 {
     std::vector<int> new_cover;
     std::vector<int> cover = APPROX_VC_1(edge_dic_2);
+    std::vector<int> cover_2 = cover;
 
     if (cover.size() == 1)
     {
@@ -60,25 +61,29 @@ std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
     }
     else
     {
-        for (auto x : cover)
+        for (auto x : cover_2)
         {
-            int count = 0;
-            for (auto y : cover)
+            bool should_add_x = false;
+            for (auto y : edge_dic_2[x])
             {
-                if (std::find(edge_dic_2[x].begin(), edge_dic_2[x].end(), y) != edge_dic_2[x].end())
+                if (std::find(cover.begin(), cover.end(), y) == cover.end())
                 {
-                    count++;
+                    should_add_x = true;
+                    break;
                 }
             }
-            int size_2 = cover.size() - 1;
-            if (count != size_2)
+            if (should_add_x)
             {
                 new_cover.push_back(x);
             }
+            else
+            {
+                cover.erase(std::remove(cover.begin(), cover.end(), x), cover.end());
+            }
         }
-        sort(new_cover.begin(), new_cover.end());
-        return new_cover;
     }
+    sort(new_cover.begin(), new_cover.end());
+    return new_cover;
 }
 
 std::vector<int> APPROX_VC_2(std::map<int, std::vector<int>> edge_dic)
@@ -147,9 +152,9 @@ std::vector<int> REFINED_APPROX_VC_2(std::map<int, std::vector<int>> edge_dic_2)
                 cover.erase(std::remove(cover.begin(), cover.end(), x), cover.end());
             }
         }
-        sort(new_cover.begin(), new_cover.end());
-        return new_cover;
     }
+    sort(new_cover.begin(), new_cover.end());
+    return new_cover;
 }
 
 void mini_sat_clauses_1(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
