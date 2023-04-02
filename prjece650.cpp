@@ -10,6 +10,267 @@
 #include "minisat/core/SolverTypes.h"
 #include "minisat/core/Solver.h"
 
+class SatSolver
+{
+private:
+    int max_vertices = 0;
+    int starting_vertex = 1;
+    std::vector<int> minimumVertexCover = std::vector<int>();
+    std::unique_ptr<Minisat::Solver> solver;
+    Minisat::vec<Minisat::Lit> clause;
+    std::vector<std::vector<Minisat::Lit>> all_literals;
+    std::vector<int> vertexEdges;
+    void formula_1(int no_of_vertex, int k);
+    void formula_1_v2(int no_of_vertex, int k);
+    void formula_2(int no_of_vertex, int k);
+    void formula_3(int no_of_vertex, int k);
+    void formula_4(int k, std::vector<int> vertexEdges);
+    void formula_4_v2(int k, std::vector<int> vertexEdges);
+
+public:
+    SatSolver(int new_max_vertices, std::vector<int> vertexEdges);
+    std::vector<int> get_min_vertex_cover_cnf();
+    std::vector<int> get_min_vertex_cover_3cnf();
+};
+
+SatSolver::SatSolver(int new_max_vertices, std::vector<int> new_vertexEdges)
+{
+    this->max_vertices = new_max_vertices;
+    this->vertexEdges = new_vertexEdges;
+    this->solver = std::unique_ptr<Minisat::Solver>(new Minisat::Solver());
+}
+
+void SatSolver::formula_1(int no_of_vertex, int currentMinimumNo)
+{
+    for (int i = 0; i < currentMinimumNo; i++)
+    {
+        for (int j = 0; j < no_of_vertex; j++)
+        {
+            this->clause.push(this->all_literals[j][i]);
+        }
+        this->solver->addClause(clause);
+        clause.clear();
+    }
+}
+void SatSolver::formula_1_v2(int no_of_vertex, int currentMinimumNo)
+{
+
+    for (int i = 0; i < currentMinimumNo; i++)
+    {
+
+        std::vector<Minisat::Lit> newVariables = std::vector<Minisat::Lit>(no_of_vertex - 1);
+        for (int i = 0; i < no_of_vertex - 1; i++)
+        {
+            newVariables[i] = Minisat::mkLit(this->solver->newVar());
+        }
+        this->solver->addClause(this->all_literals[0][i], newVariables[0]);
+        this->solver->addClause(this->all_literals[no_of_vertex - 1][i], ~newVariables[newVariables.size() - 1]);
+        for (int j = 0; j < no_of_vertex - 2; j++)
+        {
+            this->clause.push(~newVariables[j]);
+            this->clause.push(this->all_literals[j + 1][i]);
+            this->clause.push(newVariables[j + 1]);
+            this->solver->addClause(clause);
+            clause.clear();
+        }
+    }
+}
+
+void SatSolver::formula_2(int no_of_vertex, int currentMinimumNo)
+{
+    for (int m = 0; m < no_of_vertex; m++)
+    {
+        for (int p = 0; p < currentMinimumNo - 1; p++)
+        {
+            for (int q = p + 1; q < currentMinimumNo; q++)
+            {
+                this->solver->addClause(~this->all_literals[m][p], ~this->all_literals[m][q]);
+            }
+        }
+    }
+}
+
+void SatSolver::formula_3(int no_of_vertex, int currentMinimumNo)
+{
+    for (int m = 0; m < currentMinimumNo; m++)
+    {
+        for (int p = 0; p < no_of_vertex - 1; p++)
+        {
+            for (int q = p + 1; q < no_of_vertex; q++)
+            {
+                this->solver->addClause(~this->all_literals[p][m], ~this->all_literals[q][m]);
+            }
+        }
+    }
+}
+
+void SatSolver::formula_4(int currentMinimumNo, std::vector<int> input_vertexEdges)
+{
+    for (int i = 0; i < vertexEdges.size(); i = i + 2)
+    {
+        for (int j = 0; j < currentMinimumNo; j++)
+        {
+            this->clause.push(this->all_literals[input_vertexEdges[i]][j]);
+            this->clause.push(this->all_literals[input_vertexEdges[i + 1]][j]);
+        }
+        this->solver->addClause(clause);
+        this->clause.clear();
+    }
+}
+
+void SatSolver::formula_4_v2(int currentMinimumNo, std::vector<int> input_vertexEdges)
+{
+
+    for (int i = 0; i < vertexEdges.size(); i = i + 2)
+    {
+        std::vector<Minisat::Lit> newVariables = std::vector<Minisat::Lit>((2 * currentMinimumNo) - 1);
+        for (int i = 0; i < newVariables.size(); i++)
+        {
+            newVariables[i] = Minisat::mkLit(this->solver->newVar());
+        }
+        int count = 0;
+        for (int j = 0; j < currentMinimumNo; j++)
+        {
+            if (j == 0)
+            {
+                this->solver->addClause(newVariables[0], this->all_literals[input_vertexEdges[i]][j]);
+                this->solver->addClause(~newVariables[newVariables.size() - 1], this->all_literals[input_vertexEdges[i + 1]][j]);
+                continue;
+            }
+            this->clause.push(~newVariables[count]);
+            this->clause.push(this->all_literals[input_vertexEdges[i]][j]);
+            this->clause.push(newVariables[count + 1]);
+            this->solver->addClause(clause);
+            this->clause.clear();
+            count += 1;
+            this->clause.push(~newVariables[count]);
+            this->clause.push(this->all_literals[input_vertexEdges[i + 1]][j]);
+            this->clause.push(newVariables[count + 1]);
+            this->solver->addClause(clause);
+            this->clause.clear();
+            count += 1;
+        }
+    }
+}
+
+std::vector<int> SatSolver::get_min_vertex_cover_cnf()
+{
+    if (this->vertexEdges.size() < 1)
+    {
+        return this->minimumVertexCover;
+    }
+    int max = this->max_vertices;
+
+    for (int currentMinimumNo = 1; currentMinimumNo <= max; currentMinimumNo++)
+    {
+        // clear data of previous iterations
+        this->minimumVertexCover.clear();
+        this->clause.clear();
+        this->solver.reset(new Minisat::Solver());
+        this->all_literals = std::vector<std::vector<Minisat::Lit>>(max, std::vector<Minisat::Lit>(currentMinimumNo));
+
+        // initialize literals
+        for (int i = 0; i < max; i++)
+        {
+            for (int j = 0; j < currentMinimumNo; j++)
+            {
+                this->all_literals[i][j] = Minisat::mkLit(this->solver->newVar());
+            }
+        }
+
+        // formula 1
+        this->formula_1(max, currentMinimumNo);
+
+        // formula 2
+        this->formula_2(max, currentMinimumNo);
+
+        // formula 3
+        this->formula_3(max, currentMinimumNo);
+
+        // formula 4
+        this->formula_4(currentMinimumNo, this->vertexEdges);
+
+        bool isSat = this->solver->solve();
+
+        if (isSat == 1)
+        {
+            for (int i = 0; i < max; i++)
+            {
+                for (int j = 0; j < currentMinimumNo; j++)
+                {
+                    if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
+                    {
+                        this->minimumVertexCover.push_back(i);
+                    }
+                }
+            }
+            std::sort(this->minimumVertexCover.begin(), this->minimumVertexCover.end());
+            return this->minimumVertexCover;
+        }
+    }
+
+    return this->minimumVertexCover;
+}
+
+std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
+{
+    if (this->vertexEdges.size() < 1)
+    {
+        return this->minimumVertexCover;
+    }
+    int max = this->max_vertices;
+
+    for (int currentMinimumNo = 1; currentMinimumNo <= max; currentMinimumNo++)
+    {
+        // clear data of previous iterations
+        this->minimumVertexCover.clear();
+        this->clause.clear();
+        this->solver.reset(new Minisat::Solver());
+        this->all_literals = std::vector<std::vector<Minisat::Lit>>(max, std::vector<Minisat::Lit>(currentMinimumNo));
+
+        // initialize literals
+        for (int i = 0; i < max; i++)
+        {
+            for (int j = 0; j < currentMinimumNo; j++)
+            {
+                this->all_literals[i][j] = Minisat::mkLit(this->solver->newVar());
+            }
+        }
+
+        // formula 1
+        this->formula_1_v2(max, currentMinimumNo);
+
+        // formula 2
+        this->formula_2(max, currentMinimumNo);
+
+        // formula 3
+        this->formula_3(max, currentMinimumNo);
+
+        // formula 4
+        this->formula_4_v2(currentMinimumNo, this->vertexEdges);
+
+        bool isSat = this->solver->solve();
+
+        if (isSat == 1)
+        {
+            for (int i = 0; i < max; i++)
+            {
+                for (int j = 0; j < currentMinimumNo; j++)
+                {
+                    if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
+                    {
+                        this->minimumVertexCover.push_back(i);
+                    }
+                }
+            }
+            std::sort(this->minimumVertexCover.begin(), this->minimumVertexCover.end());
+            return this->minimumVertexCover;
+        }
+    }
+
+    return this->minimumVertexCover;
+}
+
 std::vector<int> APPROX_VC_1(std::map<int, std::vector<int>> edge_dic)
 {
     std::vector<int> cover;
@@ -443,54 +704,80 @@ int main()
                     */
                     if (set_keys.size() > 0)
                     {
-                        std::cout << "CNF_vertex_cover: ";
-                        std::vector<int> result = vertex_cover(edge_values, Limit); // cnf implementation
-                        sort(result.begin(), result.end());
+                        SatSolver newSatSolver(Limit, edge_values);
+                        std::cout << "CNF-SAT-VC: ";
+                        std::vector<int> result_cnf = newSatSolver.get_min_vertex_cover_cnf(); // cnf implementation
 
-                        if (result.size() > 0)
+                        if (result_cnf.size() > 0)
                         {
-                            for (int i = 0; i < result.size(); i++)
+                            std::cout << result_cnf[0];
+                            for (int i = 1; i < result_cnf.size(); i++)
                             {
-                                std::cout << result[i] << " ";
+                                std::cout << "," << result_cnf[i];
                             }
-                            std::cout << std::endl;
                         }
+                        std::cout << std::endl;
+
+                        std::vector<int> result_3cnf = newSatSolver.get_min_vertex_cover_3cnf();
+
+                        std::cout << "CNF-3-SAT-VC: ";
+                        if (result_3cnf.size() > 0)
+                        {
+                            std::cout << result_3cnf[0];
+                            for (int i = 1; i < result_3cnf.size(); i++)
+                            {
+                                std::cout << "," << result_3cnf[i];
+                            }
+                        }
+                        std::cout << std::endl;
 
                         std::vector<int> cover = APPROX_VC_1(edge_dic);
-
                         std::cout << "APPROX-VC-1: ";
-                        for (const auto &v : cover)
+                        if (cover.size() > 0)
                         {
-                            std::cout << v << " ";
+                            std::cout << cover[0];
+                            for (int i = 1; i < cover.size(); i++)
+                            {
+                                std::cout << "," << cover[i];
+                            }
                         }
-
-                        std::cout << "\n";
-
-                        std::vector<int> new_cover = REFINED_APPROX_VC_1(edge_dic);
-                        std::cout << "REFINED-APPROX-VC-1: ";
-                        for (const auto &v : new_cover)
-                        {
-                            std::cout << v << " ";
-                        }
-
-                        std::cout << "\n";
-                        std::cout << "\n";
+                        std::cout << std::endl;
 
                         std::vector<int> cover_1 = APPROX_VC_2(edge_dic);
                         std::cout << "APPROX-VC-2: ";
-                        for (const auto &v : cover_1)
+                        if (cover_1.size() > 0)
                         {
-                            std::cout << v << " ";
+                            std::cout << cover_1[0];
+                            for (int i = 1; i < cover_1.size(); i++)
+                            {
+                                std::cout << "," << cover_1[i];
+                            }
                         }
+                        std::cout << std::endl;
+
+                        std::vector<int> new_cover = REFINED_APPROX_VC_1(edge_dic);
+                        std::cout << "REFINED-APPROX-VC-1: ";
+                        if (new_cover.size() > 0)
+                        {
+                            std::cout << new_cover[0];
+                            for (int i = 1; i < new_cover.size(); i++)
+                            {
+                                std::cout << "," << new_cover[i];
+                            }
+                        }
+                        std::cout << std::endl;
 
                         std::vector<int> new_cover_1 = REFINED_APPROX_VC_2(edge_dic);
-                        std::cout << "\n";
                         std::cout << "REFINED-APPROX-VC-2: ";
-                        for (const auto &v : new_cover_1)
+                        if (new_cover_1.size() > 0)
                         {
-                            std::cout << v << " ";
+                            std::cout << new_cover_1[0];
+                            for (int i = 1; i < new_cover_1.size(); i++)
+                            {
+                                std::cout << "," << new_cover_1[i];
+                            }
                         }
-                        std::cout << "\n";
+                        std::cout << std::endl;
                     }
                     else
                     {
