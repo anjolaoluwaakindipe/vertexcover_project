@@ -9,6 +9,9 @@
 #include <memory>
 #include "minisat/core/SolverTypes.h"
 #include "minisat/core/Solver.h"
+#include <pthread.h>
+#include <signal.h>
+#include <unistd.h>
 
 class SatSolver
 {
@@ -271,9 +274,66 @@ std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
     return this->minimumVertexCover;
 }
 
-std::vector<int> APPROX_VC_1(std::map<int, std::vector<int>> edge_dic)
+struct CNF_Vals
 {
+    int noVertices;
+    std::vector<int> edgList;
+    bool foundSolution;
+    std::vector<int> result;
+};
+
+struct vc_Vals
+{
+    std::map<int, std::vector<int>> edgList;
+    std::vector<int> result;
+};
+
+void *CNF_THREAD(void *args)
+{
+    struct CNF_Vals *data = (struct CNF_Vals *)args;
+    // Install signal handler for SIGALRM
+    struct sigaction sa;
+    sa.sa_handler = [](int sig)
+    { pthread_exit(NULL); };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGALRM, &sa, NULL);
+    SatSolver newSatSolverCNF(data->noVertices, data->edgList);
+    // Set the alarm for 30 seconds
+    alarm(30);
+    data->result = newSatSolverCNF.get_min_vertex_cover_cnf();
+    data->foundSolution = true;
+    // Disable the alarm
+    alarm(0);
+    return NULL;
+}
+
+void *CNF3_THREAD(void *args)
+{
+    struct CNF_Vals *data = (struct CNF_Vals *)args;
+    // Install signal handler for SIGALRM
+    struct sigaction sa;
+    sa.sa_handler = [](int sig)
+    { pthread_exit(NULL); };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGALRM, &sa, NULL);
+    SatSolver newSatSolverCNF(data->noVertices, data->edgList);
+    // Set the alarm for 30 seconds
+    alarm(30);
+    data->result = newSatSolverCNF.get_min_vertex_cover_3cnf();
+    data->foundSolution = true;
+    // Disable the alarm
+    alarm(0);
+    return NULL;
+}
+// std::vector<int> APPROX_VC_1(std::map<int, std::vector<int>> edge_dic)
+void *APPROX_VC_1(void *args)
+{
+
     std::vector<int> cover;
+    vc_Vals *data = (vc_Vals *)args;
+    std::map<int, std::vector<int>> edge_dic = (*data).edgList;
     while (edge_dic.size() != 0)
     {
         int max_key = 0;
@@ -307,14 +367,22 @@ std::vector<int> APPROX_VC_1(std::map<int, std::vector<int>> edge_dic)
         edge_dic.erase(max_key);
     }
     sort(cover.begin(), cover.end());
-    return cover;
+    data->result = cover;
+    return NULL;
 }
 
-std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
+// std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
+void *REFINED_APPROX_VC_1(void *args)
 {
     std::vector<int> new_cover;
-    std::vector<int> cover = APPROX_VC_1(edge_dic_2);
-    std::vector<int> cover_2 = cover;
+    APPROX_VC_1(args);
+    vc_Vals *data = (vc_Vals *)args;
+    std::map<int, std::vector<int>> edge_dic_2 = (*data).edgList;
+
+    std::vector<int> cover = std::vector<int>((*data).result);
+    ;
+    std::vector<int> cover_2 = std::vector<int>((*data).result);
+    ;
 
     if (cover.size() == 1)
     {
@@ -344,12 +412,16 @@ std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
         }
     }
     sort(new_cover.begin(), new_cover.end());
-    return new_cover;
+    data->result = new_cover;
+    return NULL;
 }
 
-std::vector<int> APPROX_VC_2(std::map<int, std::vector<int>> edge_dic)
+// std::vector<int> APPROX_VC_2(std::map<int, std::vector<int>> edge_dic)
+void *APPROX_VC_2(void *args)
 {
     std::vector<int> cover;
+    vc_Vals *data = (vc_Vals *)args;
+    std::map<int, std::vector<int>> edge_dic = (*data).edgList;
     while (!edge_dic.empty())
     {
         int first_key = edge_dic.begin()->first;
@@ -378,15 +450,20 @@ std::vector<int> APPROX_VC_2(std::map<int, std::vector<int>> edge_dic)
         edge_dic.erase(first_value);
     }
     sort(cover.begin(), cover.end());
-    return cover;
+    data->result = cover;
+    return NULL;
 }
 
-std::vector<int> REFINED_APPROX_VC_2(std::map<int, std::vector<int>> edge_dic_2)
+// std::vector<int> REFINED_APPROX_VC_2(std::map<int, std::vector<int>> edge_dic_2)
+void *REFINED_APPROX_VC_2(void *args)
 {
     std::vector<int> new_cover;
-    std::vector<int> cover = APPROX_VC_2(edge_dic_2);
-    std::vector<int> cover_2 = cover;
+    APPROX_VC_2(args);
+    vc_Vals *data = (vc_Vals *)args;
+    std::map<int, std::vector<int>> edge_dic_2 = (*data).edgList;
 
+    std::vector<int> cover = std::vector<int>((*data).result);
+    std::vector<int> cover_2 = std::vector<int>((*data).result);
     if (cover.size() == 1)
     {
         new_cover.push_back(cover[0]);
@@ -415,7 +492,8 @@ std::vector<int> REFINED_APPROX_VC_2(std::map<int, std::vector<int>> edge_dic_2)
         }
     }
     sort(new_cover.begin(), new_cover.end());
-    return new_cover;
+    data->result = new_cover;
+    return NULL;
 }
 
 void mini_sat_clauses_1(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
@@ -704,34 +782,95 @@ int main()
                     */
                     if (set_keys.size() > 0)
                     {
-                        SatSolver newSatSolver(Limit, edge_values);
+                        // thread id
+                        pthread_t CNF_SAT, CNF_3SAT, VC1, VC2, VC1_REF, VC2_REF;
+
+                        // create thread
+
+                        // CNF_SAT CREATE THREAD
+                        // SatSolver newSatSolverCNF(Limit, edge_values);
+                        CNF_Vals cnf_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false, .result = std::vector<int>()};
+                        pthread_create(&CNF_SAT, NULL, &CNF_THREAD, &cnf_args);
+
+                        // CNF_3SAT CREATE THREAD
+                        CNF_Vals cnf3_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false};
+                        pthread_create(&CNF_3SAT, NULL, &CNF3_THREAD, &cnf3_args);
+
+                        // VC1 CREATE THREAD
+                        vc_Vals vc_1_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        // std::map<int, std::vector<int>> edge_dic_APPROX_VC_1(edge_dic);
+                        pthread_create(&VC1, NULL, &APPROX_VC_1, &vc_1_arg);
+                        // VC2 CREATE THREAD
+                        vc_Vals vc_2_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        // std::map<int, std::vector<int>> edge_dic_APPROX_VC_2(edge_dic);
+                        pthread_create(&VC2, NULL, &APPROX_VC_2, &vc_2_arg);
+                        // VC1_REF CREATE THREAD
+                        vc_Vals vc_1_ref_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_1(edge_dic);
+                        pthread_create(&VC1_REF, NULL, &REFINED_APPROX_VC_1, &vc_1_ref_arg);
+                        // VC2_REF CREATE THREAD
+                        vc_Vals vc_2_ref_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_2(edge_dic);
+                        pthread_create(&VC2_REF, NULL, &REFINED_APPROX_VC_2, &vc_2_ref_arg);
+
+                        // join thread
+
+                        pthread_join(CNF_SAT, NULL);
+                        pthread_join(CNF_3SAT, NULL);
+                        pthread_join(VC1, NULL);
+                        pthread_join(VC2, NULL);
+                        pthread_join(VC1_REF, NULL);
+                        pthread_join(VC2_REF, NULL);
+
+                        std::vector<int> cover = vc_1_arg.result;
+                        std::vector<int> cover_1 = vc_2_arg.result;
+                        std::vector<int> new_cover = vc_1_ref_arg.result;
+                        std::vector<int> new_cover_1 = vc_2_ref_arg.result;
+                        // print the output of each thread
+
+                        // CNF PRINT
                         std::cout << "CNF-SAT-VC: ";
-                        std::vector<int> result_cnf = newSatSolver.get_min_vertex_cover_cnf(); // cnf implementation
-
-                        if (result_cnf.size() > 0)
+                        // std::vector<int> result_cnf = newSatSolverCNF.get_min_vertex_cover_cnf(); // cnf implementation
+                        std::vector<int> result_cnf = cnf_args.result;
+                        if (cnf_args.foundSolution == false)
                         {
-                            std::cout << result_cnf[0];
-                            for (int i = 1; i < result_cnf.size(); i++)
+                            std::cout << "timeout";
+                        }
+                        else
+                        {
+                            if (result_cnf.size() > 0)
                             {
-                                std::cout << "," << result_cnf[i];
+                                std::cout << result_cnf[0];
+                                for (int i = 1; i < result_cnf.size(); i++)
+                                {
+                                    std::cout << "," << result_cnf[i];
+                                }
                             }
                         }
                         std::cout << std::endl;
 
-                        std::vector<int> result_3cnf = newSatSolver.get_min_vertex_cover_3cnf();
-
+                        // CNF-3 PRINT
                         std::cout << "CNF-3-SAT-VC: ";
-                        if (result_3cnf.size() > 0)
+                        // std::vector<int> result_cnf = newSatSolverCNF.get_min_vertex_cover_cnf(); // cnf implementation
+                        std::vector<int> result_3cnf = cnf3_args.result;
+                        if (cnf_args.foundSolution == false)
                         {
-                            std::cout << result_3cnf[0];
-                            for (int i = 1; i < result_3cnf.size(); i++)
+                            std::cout << "timeout";
+                        }
+                        else
+                        {
+                            if (result_3cnf.size() > 0)
                             {
-                                std::cout << "," << result_3cnf[i];
+                                std::cout << result_3cnf[0];
+                                for (int i = 1; i < result_3cnf.size(); i++)
+                                {
+                                    std::cout << "," << result_3cnf[i];
+                                }
                             }
                         }
                         std::cout << std::endl;
-
-                        std::vector<int> cover = APPROX_VC_1(edge_dic);
+                        // VC-1 PRINT
+                        // std::vector<int> cover = APPROX_VC_1(edge_dic);
                         std::cout << "APPROX-VC-1: ";
                         if (cover.size() > 0)
                         {
@@ -742,8 +881,8 @@ int main()
                             }
                         }
                         std::cout << std::endl;
-
-                        std::vector<int> cover_1 = APPROX_VC_2(edge_dic);
+                        // VC-2 PRINT
+                        // std::vector<int> cover_1 = APPROX_VC_2(edge_dic);
                         std::cout << "APPROX-VC-2: ";
                         if (cover_1.size() > 0)
                         {
@@ -755,7 +894,8 @@ int main()
                         }
                         std::cout << std::endl;
 
-                        std::vector<int> new_cover = REFINED_APPROX_VC_1(edge_dic);
+                        // VC-1-REF PRINT
+                        // std::vector<int> new_cover = REFINED_APPROX_VC_1(edge_dic);
                         std::cout << "REFINED-APPROX-VC-1: ";
                         if (new_cover.size() > 0)
                         {
@@ -767,7 +907,8 @@ int main()
                         }
                         std::cout << std::endl;
 
-                        std::vector<int> new_cover_1 = REFINED_APPROX_VC_2(edge_dic);
+                        // VC-2-REF PRINT
+                        // std::vector<int> new_cover_1 = REFINED_APPROX_VC_2(edge_dic);
                         std::cout << "REFINED-APPROX-VC-2: ";
                         if (new_cover_1.size() > 0)
                         {

@@ -22,6 +22,10 @@ include_directories(${CMAKE_SOURCE_DIR}/minisat)
 add_executable(prjece650 prjece650.cpp)
 # link MiniSAT libraries
 target_link_libraries(prjece650 minisat-lib-static)
+target_link_libraries(prjece650 ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(prjece650 pthread)
+target_link_libraries(prjece650 -lpthread)
+
 
 # create the executable for tests
 # add_executable(test test.cpp)
