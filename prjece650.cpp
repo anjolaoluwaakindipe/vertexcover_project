@@ -129,8 +129,8 @@ void SatSolver::formula_4(int currentMinimumNo, std::vector<int> input_vertexEdg
     {
         for (int j = 0; j < currentMinimumNo; j++)
         {
-            this->clause.push(this->all_literals[input_vertexEdges[i]][j]);
-            this->clause.push(this->all_literals[input_vertexEdges[i + 1]][j]);
+            this->clause.push(this->all_literals[input_vertexEdges[i] - 1][j]);
+            this->clause.push(this->all_literals[input_vertexEdges[i + 1] - 1][j]);
         }
         this->solver->addClause(clause);
         this->clause.clear();
@@ -152,18 +152,18 @@ void SatSolver::formula_4_v2(int currentMinimumNo, std::vector<int> input_vertex
         {
             if (j == 0)
             {
-                this->solver->addClause(newVariables[0], this->all_literals[input_vertexEdges[i]][j]);
-                this->solver->addClause(~newVariables[newVariables.size() - 1], this->all_literals[input_vertexEdges[i + 1]][j]);
+                this->solver->addClause(newVariables[0], this->all_literals[input_vertexEdges[i] - 1][j]);
+                this->solver->addClause(~newVariables[newVariables.size() - 1], this->all_literals[input_vertexEdges[i + 1] - 1][j]);
                 continue;
             }
             this->clause.push(~newVariables[count]);
-            this->clause.push(this->all_literals[input_vertexEdges[i]][j]);
+            this->clause.push(this->all_literals[input_vertexEdges[i] - 1][j]);
             this->clause.push(newVariables[count + 1]);
             this->solver->addClause(clause);
             this->clause.clear();
             count += 1;
             this->clause.push(~newVariables[count]);
-            this->clause.push(this->all_literals[input_vertexEdges[i + 1]][j]);
+            this->clause.push(this->all_literals[input_vertexEdges[i + 1] - 1][j]);
             this->clause.push(newVariables[count + 1]);
             this->solver->addClause(clause);
             this->clause.clear();
@@ -219,7 +219,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_cnf()
                 {
                     if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
                     {
-                        this->minimumVertexCover.push_back(i);
+                        this->minimumVertexCover.push_back(i+1);
                     }
                 }
             }
@@ -278,7 +278,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
                 {
                     if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
                     {
-                        this->minimumVertexCover.push_back(i);
+                        this->minimumVertexCover.push_back(i+1);
                     }
                 }
             }
@@ -780,7 +780,7 @@ int main()
                 {
                     int x, y;
                     std::tie(x, y) = val;
-                    if (x >= Limit || y >= Limit)
+                    if (x > Limit || y > Limit)
                     {
                         // std::cout <<x<<" "<<y<<" = "<< Limit<<"\n";
                         count++;
@@ -855,8 +855,8 @@ int main()
                         clock_gettime(CLOCK_REALTIME, &timeout);
                         clock_gettime(CLOCK_REALTIME, &remaining_time);
 
-                        remaining_time.tv_sec += 60;
-                        timeout.tv_sec += 60;
+                        remaining_time.tv_sec += 30;
+                        timeout.tv_sec += 30;
 
                         // pthread_join(CNF_SAT, NULL);
                         // pthread_join(CNF_3SAT, NULL);
@@ -868,14 +868,14 @@ int main()
 
                         if (pthread_timedjoin_np(CNF_SAT, NULL, &timeout) == ETIMEDOUT)
                         {
-                            pthread_kill(CNF_SAT, SIGKILL);
-                            CNF_TIME = 60;
+                            pthread_cancel(CNF_SAT);
+                            CNF_TIME = 30000;
                         }
 
                         if (pthread_timedjoin_np(CNF_3SAT, NULL, &remaining_time) == ETIMEDOUT)
                         {
-                            pthread_kill(CNF_3SAT, SIGKILL);
-                            CNF3_TIME = 60;
+                            pthread_cancel(CNF_3SAT);
+                            CNF3_TIME = 30000;
                         }
 
                         std::vector<int> cover = vc_1_arg.result;
