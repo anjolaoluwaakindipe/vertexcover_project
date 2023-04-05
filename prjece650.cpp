@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -20,6 +21,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+double CNF_TIME;
+double CNF3_TIME;
+double VC1_TIME;
+double VC2_TIME;
+double VC1_REF_TIME;
+double VC2_REF_TIME;
 
 class SatSolver
 {
@@ -308,8 +316,9 @@ void *CNF_THREAD(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "CNF Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
+    CNF_TIME = duration_ms;
+    // std::string message = "CNF Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
     return NULL;
 }
 
@@ -324,8 +333,9 @@ void *CNF3_THREAD(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "CNF3 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
+    // std::string message = "CNF3 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
+    CNF3_TIME = duration_ms;
     return NULL;
 }
 
@@ -377,8 +387,9 @@ void *APPROX_VC_1(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
+    // std::string message = "V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
+    VC1_TIME = duration_ms;
 
     return NULL;
 }
@@ -475,8 +486,9 @@ void *REFINED_APPROX_VC_1(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "REF V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
+    // std::string message = "REF V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
+    VC1_REF_TIME = duration_ms;
 
     return NULL;
 }
@@ -523,8 +535,9 @@ void *APPROX_VC_2(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
+    // std::string message = "V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
+    VC2_TIME = duration_ms;
 
     return NULL;
 }
@@ -612,9 +625,9 @@ void *REFINED_APPROX_VC_2(void *args)
     struct timespec ts;
     clock_gettime(cid, &ts);
     double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    std::string message = "REF V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
-    std::cout << message;
-
+    // std::string message = "REF V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    // std::cout << message;
+    VC2_REF_TIME = duration_ms;
     return NULL;
 }
 
@@ -855,12 +868,14 @@ int main()
 
                         if (pthread_timedjoin_np(CNF_SAT, NULL, &timeout) == ETIMEDOUT)
                         {
-                            pthread_cancel(CNF_SAT);
+                            pthread_kill(CNF_SAT, SIGKILL);
+                            CNF_TIME = 60;
                         }
 
                         if (pthread_timedjoin_np(CNF_3SAT, NULL, &remaining_time) == ETIMEDOUT)
                         {
-                            pthread_cancel(CNF_3SAT);
+                            pthread_kill(CNF_3SAT, SIGKILL);
+                            CNF3_TIME = 60;
                         }
 
                         std::vector<int> cover = vc_1_arg.result;
@@ -868,6 +883,57 @@ int main()
                         std::vector<int> new_cover = vc_1_ref_arg.result;
                         std::vector<int> new_cover_1 = vc_2_ref_arg.result;
                         // print the output of each thread
+
+                        // append result to file
+                        std::ofstream myfile("example.csv", std::ios_base::app);
+                        if (!myfile.is_open())
+                        {
+                        }
+                        myfile << Limit << ","
+                               << "CNF," << CNF_TIME << "," << -1 << std::endl;
+                        myfile << Limit << ","
+                               << "3CNF," << CNF3_TIME << "," << -1 << std::endl;
+                        myfile << Limit << ","
+                               << "VC1," << VC1_TIME << ",";
+                        if (cnf_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_1_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else
+                        {
+                            myfile << -1 << std::endl;
+                        }
+                        myfile << Limit << ","
+                               << "VC2," << VC2_TIME << ",";
+                        if (cnf_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_2_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else
+                        {
+                            myfile << -1 << std::endl;
+                        }
+                        myfile << Limit << ","
+                               << "VC1-REF," << VC1_REF_TIME << ",";
+                        if (cnf_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else
+                        {
+                            myfile << -1 << std::endl;
+                        }
+                        myfile << Limit << ","
+                               << "VC2-REF," << VC2_REF_TIME << ",";
+                        if (cnf_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else
+                        {
+                            myfile << -1 << std::endl;
+                        }
+                        myfile.close();
 
                         // CNF PRINT
                         std::cout << "CNF-SAT-VC: ";
