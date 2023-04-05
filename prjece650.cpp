@@ -12,6 +12,14 @@
 #include <pthread.h>
 #include <signal.h>
 #include <unistd.h>
+#include <chrono>
+#include <sys/time.h>
+#include <time.h>
+#include <errno.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 class SatSolver
 {
@@ -286,51 +294,97 @@ struct vc_Vals
 {
     std::map<int, std::vector<int>> edgList;
     std::vector<int> result;
+    bool flag;
 };
 
 void *CNF_THREAD(void *args)
 {
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
     struct CNF_Vals *data = (struct CNF_Vals *)args;
-    // Install signal handler for SIGALRM
-    struct sigaction sa;
-    sa.sa_handler = [](int sig)
-    { pthread_exit(NULL); };
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
     SatSolver newSatSolverCNF(data->noVertices, data->edgList);
-    // Set the alarm for 30 seconds
-    alarm(30);
     data->result = newSatSolverCNF.get_min_vertex_cover_cnf();
     data->foundSolution = true;
-    // Disable the alarm
-    alarm(0);
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "CNF Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
     return NULL;
 }
 
 void *CNF3_THREAD(void *args)
 {
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
     struct CNF_Vals *data = (struct CNF_Vals *)args;
-    // Install signal handler for SIGALRM
-    struct sigaction sa;
-    sa.sa_handler = [](int sig)
-    { pthread_exit(NULL); };
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
     SatSolver newSatSolverCNF(data->noVertices, data->edgList);
-    // Set the alarm for 30 seconds
-    alarm(30);
     data->result = newSatSolverCNF.get_min_vertex_cover_3cnf();
     data->foundSolution = true;
-    // Disable the alarm
-    alarm(0);
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "CNF3 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
     return NULL;
 }
-// std::vector<int> APPROX_VC_1(std::map<int, std::vector<int>> edge_dic)
+
 void *APPROX_VC_1(void *args)
 {
 
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
+
+    std::vector<int> cover;
+    vc_Vals *data = (vc_Vals *)args;
+
+    std::map<int, std::vector<int>> edge_dic = (*data).edgList;
+    while (edge_dic.size() != 0)
+    {
+        int max_key = 0;
+        int max_len = 0;
+
+        for (const auto &p : edge_dic)
+        {
+            int key = p.first;
+            int val = p.second.size();
+            if (val > max_len)
+            {
+                max_key = key;
+                max_len = val;
+            }
+        }
+
+        cover.push_back(max_key);
+
+        for (const auto &value : edge_dic[max_key])
+        {
+            auto it = std::find(edge_dic[value].begin(), edge_dic[value].end(), max_key);
+            if (it != edge_dic[value].end())
+            {
+                edge_dic[value].erase(it);
+            }
+            if (edge_dic[value].size() == 0)
+            {
+                edge_dic.erase(value);
+            }
+        }
+        edge_dic.erase(max_key);
+    }
+    sort(cover.begin(), cover.end());
+    data->result = cover;
+
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
+
+    return NULL;
+}
+
+void *APPROX_VC_1_ref(void *args)
+{
     std::vector<int> cover;
     vc_Vals *data = (vc_Vals *)args;
     std::map<int, std::vector<int>> edge_dic = (*data).edgList;
@@ -371,18 +425,22 @@ void *APPROX_VC_1(void *args)
     return NULL;
 }
 
-// std::vector<int> REFINED_APPROX_VC_1(std::map<int, std::vector<int>> edge_dic_2)
 void *REFINED_APPROX_VC_1(void *args)
 {
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
+
     std::vector<int> new_cover;
-    APPROX_VC_1(args);
+
+    APPROX_VC_1_ref(args);
+
     vc_Vals *data = (vc_Vals *)args;
+
     std::map<int, std::vector<int>> edge_dic_2 = (*data).edgList;
 
     std::vector<int> cover = std::vector<int>((*data).result);
-    ;
+
     std::vector<int> cover_2 = std::vector<int>((*data).result);
-    ;
 
     if (cover.size() == 1)
     {
@@ -413,11 +471,65 @@ void *REFINED_APPROX_VC_1(void *args)
     }
     sort(new_cover.begin(), new_cover.end());
     data->result = new_cover;
+
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "REF V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
+
     return NULL;
 }
 
-// std::vector<int> APPROX_VC_2(std::map<int, std::vector<int>> edge_dic)
 void *APPROX_VC_2(void *args)
+{
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
+
+    std::vector<int> cover;
+    vc_Vals *data = (vc_Vals *)args;
+
+    std::map<int, std::vector<int>> edge_dic = (*data).edgList;
+    while (!edge_dic.empty())
+    {
+        int first_key = edge_dic.begin()->first;
+        int first_value = edge_dic.begin()->second[0];
+        cover.push_back(first_key);
+        cover.push_back(first_value);
+        for (auto &value : edge_dic[first_key])
+        {
+            auto &other_values = edge_dic[value];
+            other_values.erase(std::remove(other_values.begin(), other_values.end(), first_key), other_values.end());
+            if (other_values.empty())
+            {
+                edge_dic.erase(value);
+            }
+        }
+        edge_dic.erase(first_key);
+        for (auto &value : edge_dic[first_value])
+        {
+            auto &other_values = edge_dic[value];
+            other_values.erase(std::remove(other_values.begin(), other_values.end(), first_value), other_values.end());
+            if (other_values.empty())
+            {
+                edge_dic.erase(value);
+            }
+        }
+        edge_dic.erase(first_value);
+    }
+    sort(cover.begin(), cover.end());
+    data->result = cover;
+
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
+
+    return NULL;
+}
+
+void *APPROX_VC_2_ref(void *args)
 {
     std::vector<int> cover;
     vc_Vals *data = (vc_Vals *)args;
@@ -454,11 +566,14 @@ void *APPROX_VC_2(void *args)
     return NULL;
 }
 
-// std::vector<int> REFINED_APPROX_VC_2(std::map<int, std::vector<int>> edge_dic_2)
 void *REFINED_APPROX_VC_2(void *args)
 {
+    // Get the current time
+    clockid_t cid;
+    pthread_getcpuclockid(pthread_self(), &cid);
+
     std::vector<int> new_cover;
-    APPROX_VC_2(args);
+    APPROX_VC_2_ref(args);
     vc_Vals *data = (vc_Vals *)args;
     std::map<int, std::vector<int>> edge_dic_2 = (*data).edgList;
 
@@ -493,107 +608,14 @@ void *REFINED_APPROX_VC_2(void *args)
     }
     sort(new_cover.begin(), new_cover.end());
     data->result = new_cover;
+
+    struct timespec ts;
+    clock_gettime(cid, &ts);
+    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    std::string message = "REF V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
+    std::cout << message;
+
     return NULL;
-}
-
-void mini_sat_clauses_1(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
-{
-    for (int i = 0; i < vector_of_vector[i].size(); i++)
-    {
-        Minisat::vec<Minisat::Lit> sub_vec;
-        for (int j = 0; j < vector_of_vector.size(); j++)
-        {
-            sub_vec.push(vector_of_vector[j][i]);
-        }
-        solver->addClause(sub_vec);
-    }
-}
-
-void mini_sat_clauses_2(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
-{
-    for (int i = 0; i < vector_of_vector.size(); i++)
-    {
-        for (int j = 0; j < vector_of_vector[i].size() - 1; j++)
-        {
-            for (int k = j + 1; k < vector_of_vector[k].size(); k++)
-            {
-                solver->addClause(~vector_of_vector[i][j], ~vector_of_vector[i][k]);
-            }
-        }
-    }
-}
-
-void mini_sat_clauses_3(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
-{
-    for (int i = 0; i < vector_of_vector[i].size(); i++)
-    {
-        for (int j = 0; j < Limit - 1; j++)
-        {
-            for (int k = j + 1; k < vector_of_vector.size(); k++)
-            {
-                solver->addClause(~vector_of_vector[j][i], ~vector_of_vector[k][i]);
-            }
-        }
-    }
-}
-
-void mini_sat_clauses_4(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> &vector_of_vector, Minisat::Solver *solver)
-{
-    for (int i = 0; i < edge_values.size(); i += 2)
-    {
-        Minisat::vec<Minisat::Lit> sub_vec;
-        for (int j = 0; j < vector_of_vector[j].size(); j++)
-        {
-            sub_vec.push(vector_of_vector[edge_values[i]][j]);
-            sub_vec.push(vector_of_vector[edge_values[i + 1]][j]);
-        }
-        solver->addClause(sub_vec);
-    }
-}
-
-void mini_sat_clauses_1_4(std::vector<int> edge_values, int Limit, std::vector<std::vector<Minisat::Lit>> vector_of_vector, Minisat::Solver *solver)
-{
-    mini_sat_clauses_1(edge_values, Limit, vector_of_vector, solver);
-    mini_sat_clauses_2(edge_values, Limit, vector_of_vector, solver);
-    mini_sat_clauses_3(edge_values, Limit, vector_of_vector, solver);
-    mini_sat_clauses_4(edge_values, Limit, vector_of_vector, solver);
-}
-
-std::vector<int> vertex_cover(std::vector<int> edge_values, int Limit)
-{
-    std::vector<int> vertex_cover_1;
-
-    for (int cover_length = 1; cover_length <= Limit; cover_length++)
-    {
-        std::unique_ptr<Minisat::Solver> solver(new Minisat::Solver());
-        std::vector<std::vector<Minisat::Lit>> vector_of_vector(Limit);
-
-        for (int i = 0; i < Limit; i++)
-        {
-            for (int j = 0; j < cover_length; j++)
-            {
-                vector_of_vector[i].push_back(Minisat::mkLit(solver->newVar()));
-            }
-        }
-
-        mini_sat_clauses_1_4(edge_values, Limit, vector_of_vector, solver.get());
-
-        if (solver->solve())
-        {
-            for (int i = 0; i < vector_of_vector.size(); i++)
-            {
-                for (int j = 0; j < vector_of_vector[j].size(); j++)
-                {
-                    if (solver->modelValue(vector_of_vector[i][j]) == (Minisat::lbool) true)
-                    {
-                        vertex_cover_1.push_back(i);
-                    }
-                }
-            }
-            return vertex_cover_1;
-        }
-        solver.reset(new Minisat::Solver());
-    }
 }
 
 std::vector<int> short_part(const std::map<int, std::vector<int>> edge_dic, int start, int end)
@@ -793,34 +815,53 @@ int main()
                         pthread_create(&CNF_SAT, NULL, &CNF_THREAD, &cnf_args);
 
                         // CNF_3SAT CREATE THREAD
-                        CNF_Vals cnf3_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false};
+                        CNF_Vals cnf3_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false, .result = std::vector<int>()};
                         pthread_create(&CNF_3SAT, NULL, &CNF3_THREAD, &cnf3_args);
 
                         // VC1 CREATE THREAD
-                        vc_Vals vc_1_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        vc_Vals vc_1_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true};
                         // std::map<int, std::vector<int>> edge_dic_APPROX_VC_1(edge_dic);
                         pthread_create(&VC1, NULL, &APPROX_VC_1, &vc_1_arg);
                         // VC2 CREATE THREAD
-                        vc_Vals vc_2_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        vc_Vals vc_2_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true};
                         // std::map<int, std::vector<int>> edge_dic_APPROX_VC_2(edge_dic);
                         pthread_create(&VC2, NULL, &APPROX_VC_2, &vc_2_arg);
                         // VC1_REF CREATE THREAD
-                        vc_Vals vc_1_ref_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        vc_Vals vc_1_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false};
                         // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_1(edge_dic);
                         pthread_create(&VC1_REF, NULL, &REFINED_APPROX_VC_1, &vc_1_ref_arg);
                         // VC2_REF CREATE THREAD
-                        vc_Vals vc_2_ref_arg = {.edgList = edge_dic, .result = std::vector<int>()};
+                        vc_Vals vc_2_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false};
                         // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_2(edge_dic);
                         pthread_create(&VC2_REF, NULL, &REFINED_APPROX_VC_2, &vc_2_ref_arg);
 
                         // join thread
+                        struct timespec timeout;
+                        struct timespec remaining_time;
 
-                        pthread_join(CNF_SAT, NULL);
-                        pthread_join(CNF_3SAT, NULL);
+                        clock_gettime(CLOCK_REALTIME, &timeout);
+                        clock_gettime(CLOCK_REALTIME, &remaining_time);
+
+                        remaining_time.tv_sec += 60;
+                        timeout.tv_sec += 60;
+
+                        // pthread_join(CNF_SAT, NULL);
+                        // pthread_join(CNF_3SAT, NULL);
+
                         pthread_join(VC1, NULL);
                         pthread_join(VC2, NULL);
                         pthread_join(VC1_REF, NULL);
                         pthread_join(VC2_REF, NULL);
+
+                        if (pthread_timedjoin_np(CNF_SAT, NULL, &timeout) == ETIMEDOUT)
+                        {
+                            pthread_cancel(CNF_SAT);
+                        }
+
+                        if (pthread_timedjoin_np(CNF_3SAT, NULL, &remaining_time) == ETIMEDOUT)
+                        {
+                            pthread_cancel(CNF_3SAT);
+                        }
 
                         std::vector<int> cover = vc_1_arg.result;
                         std::vector<int> cover_1 = vc_2_arg.result;
@@ -830,7 +871,6 @@ int main()
 
                         // CNF PRINT
                         std::cout << "CNF-SAT-VC: ";
-                        // std::vector<int> result_cnf = newSatSolverCNF.get_min_vertex_cover_cnf(); // cnf implementation
                         std::vector<int> result_cnf = cnf_args.result;
                         if (cnf_args.foundSolution == false)
                         {
@@ -853,7 +893,7 @@ int main()
                         std::cout << "CNF-3-SAT-VC: ";
                         // std::vector<int> result_cnf = newSatSolverCNF.get_min_vertex_cover_cnf(); // cnf implementation
                         std::vector<int> result_3cnf = cnf3_args.result;
-                        if (cnf_args.foundSolution == false)
+                        if (cnf3_args.foundSolution == false)
                         {
                             std::cout << "timeout";
                         }
