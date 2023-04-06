@@ -219,7 +219,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_cnf()
                 {
                     if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
                     {
-                        this->minimumVertexCover.push_back(i+1);
+                        this->minimumVertexCover.push_back(i + 1);
                     }
                 }
             }
@@ -278,7 +278,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
                 {
                     if (this->solver->modelValue(this->all_literals[i][j]) == (Minisat::lbool) true)
                     {
-                        this->minimumVertexCover.push_back(i+1);
+                        this->minimumVertexCover.push_back(i + 1);
                     }
                 }
             }
@@ -899,6 +899,10 @@ int main()
                         {
                             myfile << ((double)vc_1_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
                         }
+                        else if (cnf3_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_1_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        }
                         else
                         {
                             myfile << -1 << std::endl;
@@ -908,6 +912,10 @@ int main()
                         if (cnf_args.foundSolution == true)
                         {
                             myfile << ((double)vc_2_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else if (cnf3_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_2_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
                         }
                         else
                         {
@@ -919,6 +927,10 @@ int main()
                         {
                             myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
                         }
+                        else if (cnf3_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        }
                         else
                         {
                             myfile << -1 << std::endl;
@@ -928,6 +940,10 @@ int main()
                         if (cnf_args.foundSolution == true)
                         {
                             myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        }
+                        else if (cnf3_args.foundSolution == true)
+                        {
+                            myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
                         }
                         else
                         {
