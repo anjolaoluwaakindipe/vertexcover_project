@@ -22,20 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-double CNF_TIME;
-double CNF3_TIME;
-double VC1_TIME;
-double VC2_TIME;
-double VC1_REF_TIME;
-double VC2_REF_TIME;
-
 class SatSolver
 {
 private:
     int max_vertices = 0;
     int starting_vertex = 1;
     std::vector<int> minimumVertexCover = std::vector<int>();
-    std::unique_ptr<Minisat::Solver> solver;
     Minisat::vec<Minisat::Lit> clause;
     std::vector<std::vector<Minisat::Lit>> all_literals;
     std::vector<int> vertexEdges;
@@ -48,6 +40,7 @@ private:
 
 public:
     SatSolver(int new_max_vertices, std::vector<int> vertexEdges);
+    std::shared_ptr<Minisat::Solver> solver;
     std::vector<int> get_min_vertex_cover_cnf();
     std::vector<int> get_min_vertex_cover_3cnf();
 };
@@ -56,7 +49,7 @@ SatSolver::SatSolver(int new_max_vertices, std::vector<int> new_vertexEdges)
 {
     this->max_vertices = new_max_vertices;
     this->vertexEdges = new_vertexEdges;
-    this->solver = std::unique_ptr<Minisat::Solver>(new Minisat::Solver());
+    this->solver = std::shared_ptr<Minisat::Solver>(new Minisat::Solver());
 }
 
 void SatSolver::formula_1(int no_of_vertex, int currentMinimumNo)
@@ -210,6 +203,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_cnf()
         this->formula_4(currentMinimumNo, this->vertexEdges);
 
         bool isSat = this->solver->solve();
+        pthread_testcancel();
 
         if (isSat == 1)
         {
@@ -269,6 +263,7 @@ std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
         this->formula_4_v2(currentMinimumNo, this->vertexEdges);
 
         bool isSat = this->solver->solve();
+        pthread_testcancel();
 
         if (isSat == 1)
         {
@@ -292,10 +287,13 @@ std::vector<int> SatSolver::get_min_vertex_cover_3cnf()
 
 struct CNF_Vals
 {
+    SatSolver satSolver;
     int noVertices;
     std::vector<int> edgList;
     bool foundSolution;
     std::vector<int> result;
+    double time;
+    CNF_Vals(std::vector<int> edgeList, int noOfVertices) : satSolver(noOfVertices, edgeList), foundSolution(false), noVertices(noOfVertices), time(0), result(std::vector<int>()), edgList(edgeList) {}
 };
 
 struct vc_Vals
@@ -303,6 +301,7 @@ struct vc_Vals
     std::map<int, std::vector<int>> edgList;
     std::vector<int> result;
     bool flag;
+    double time;
 };
 
 void *CNF_THREAD(void *args)
@@ -310,13 +309,12 @@ void *CNF_THREAD(void *args)
     clockid_t cid;
     pthread_getcpuclockid(pthread_self(), &cid);
     struct CNF_Vals *data = (struct CNF_Vals *)args;
-    SatSolver newSatSolverCNF(data->noVertices, data->edgList);
-    data->result = newSatSolverCNF.get_min_vertex_cover_cnf();
+    data->result = data->satSolver.get_min_vertex_cover_cnf();
     data->foundSolution = true;
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
-    CNF_TIME = duration_ms;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
+    data->time = duration_ms;
     // std::string message = "CNF Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
     return NULL;
@@ -332,10 +330,10 @@ void *CNF3_THREAD(void *args)
     data->foundSolution = true;
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) *1000;
     // std::string message = "CNF3 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
-    CNF3_TIME = duration_ms;
+    data->time = duration_ms;
     return NULL;
 }
 
@@ -386,10 +384,10 @@ void *APPROX_VC_1(void *args)
 
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
     // std::string message = "V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
-    VC1_TIME = duration_ms;
+    data->time = duration_ms;
 
     return NULL;
 }
@@ -485,10 +483,10 @@ void *REFINED_APPROX_VC_1(void *args)
 
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
     // std::string message = "REF V1 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
-    VC1_REF_TIME = duration_ms;
+    data->time = duration_ms;
 
     return NULL;
 }
@@ -534,10 +532,10 @@ void *APPROX_VC_2(void *args)
 
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
     // std::string message = "V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
-    VC2_TIME = duration_ms;
+    data->time = duration_ms;
 
     return NULL;
 }
@@ -624,10 +622,10 @@ void *REFINED_APPROX_VC_2(void *args)
 
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
     // std::string message = "REF V2 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
-    VC2_REF_TIME = duration_ms;
+    data->time = duration_ms;
     return NULL;
 }
 
@@ -824,27 +822,28 @@ int main()
 
                         // CNF_SAT CREATE THREAD
                         // SatSolver newSatSolverCNF(Limit, edge_values);
-                        CNF_Vals cnf_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false, .result = std::vector<int>()};
+                        SatSolver newSatSolverCNF(Limit, edge_values);
+                        CNF_Vals cnf_args(edge_values, Limit);
                         pthread_create(&CNF_SAT, NULL, &CNF_THREAD, &cnf_args);
 
                         // CNF_3SAT CREATE THREAD
-                        CNF_Vals cnf3_args = {.noVertices = Limit, .edgList = edge_values, .foundSolution = false, .result = std::vector<int>()};
+                        CNF_Vals cnf3_args(edge_values, Limit);
                         pthread_create(&CNF_3SAT, NULL, &CNF3_THREAD, &cnf3_args);
 
                         // VC1 CREATE THREAD
-                        vc_Vals vc_1_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true};
+                        vc_Vals vc_1_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true, .time = 0};
                         // std::map<int, std::vector<int>> edge_dic_APPROX_VC_1(edge_dic);
                         pthread_create(&VC1, NULL, &APPROX_VC_1, &vc_1_arg);
                         // VC2 CREATE THREAD
-                        vc_Vals vc_2_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true};
+                        vc_Vals vc_2_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = true, .time = 0};
                         // std::map<int, std::vector<int>> edge_dic_APPROX_VC_2(edge_dic);
                         pthread_create(&VC2, NULL, &APPROX_VC_2, &vc_2_arg);
                         // VC1_REF CREATE THREAD
-                        vc_Vals vc_1_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false};
+                        vc_Vals vc_1_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false, .time = 0};
                         // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_1(edge_dic);
                         pthread_create(&VC1_REF, NULL, &REFINED_APPROX_VC_1, &vc_1_ref_arg);
                         // VC2_REF CREATE THREAD
-                        vc_Vals vc_2_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false};
+                        vc_Vals vc_2_ref_arg = {.edgList = edge_dic, .result = std::vector<int>(), .flag = false, .time = 0};
                         // std::map<int, std::vector<int>> edge_dic_REFINED_APPROX_VC_2(edge_dic);
                         pthread_create(&VC2_REF, NULL, &REFINED_APPROX_VC_2, &vc_2_ref_arg);
 
@@ -869,13 +868,23 @@ int main()
                         if (pthread_timedjoin_np(CNF_SAT, NULL, &timeout) == ETIMEDOUT)
                         {
                             pthread_cancel(CNF_SAT);
-                            CNF_TIME = 30000;
+                            cnf_args.satSolver.solver->interrupt();
+                            if (cnf_args.result.size() == 0)
+                            {
+                                cnf_args.time = 30000000;
+                            }
+                            pthread_join(CNF_SAT, NULL);
                         }
 
                         if (pthread_timedjoin_np(CNF_3SAT, NULL, &remaining_time) == ETIMEDOUT)
                         {
                             pthread_cancel(CNF_3SAT);
-                            CNF3_TIME = 30000;
+                            cnf3_args.satSolver.solver->interrupt();
+                            if (cnf3_args.result.size() == 0)
+                            {
+                                cnf3_args.time = 30000000;
+                            }
+                            pthread_join(CNF_3SAT, NULL);
                         }
 
                         std::vector<int> cover = vc_1_arg.result;
@@ -890,16 +899,16 @@ int main()
                         {
                         }
                         myfile << Limit << ","
-                               << "CNF," << CNF_TIME << "," << -1 << std::endl;
+                               << "CNF," << cnf_args.time << "," << -1 << std::endl;
                         myfile << Limit << ","
-                               << "3CNF," << CNF3_TIME << "," << -1 << std::endl;
+                               << "3CNF," << cnf3_args.time << "," << -1 << std::endl;
                         myfile << Limit << ","
-                               << "VC1," << VC1_TIME << ",";
-                        if (cnf_args.foundSolution == true)
+                               << "VC1," << vc_1_arg.time << ",";
+                        if (cnf_args.result.size() != 0)
                         {
                             myfile << ((double)vc_1_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
                         }
-                        else if (cnf3_args.foundSolution == true)
+                        else if (cnf3_args.result.size() != 0)
                         {
                             myfile << ((double)vc_1_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
                         }
@@ -908,12 +917,12 @@ int main()
                             myfile << -1 << std::endl;
                         }
                         myfile << Limit << ","
-                               << "VC2," << VC2_TIME << ",";
-                        if (cnf_args.foundSolution == true)
+                               << "VC2," << vc_2_arg.time << ",";
+                        if (cnf_args.result.size() != 0)
                         {
                             myfile << ((double)vc_2_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
                         }
-                        else if (cnf3_args.foundSolution == true)
+                        else if (cnf3_args.result.size() != 0)
                         {
                             myfile << ((double)vc_2_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
                         }
@@ -922,12 +931,12 @@ int main()
                             myfile << -1 << std::endl;
                         }
                         myfile << Limit << ","
-                               << "VC1-REF," << VC1_REF_TIME << ",";
-                        if (cnf_args.foundSolution == true)
+                               << "VC1-REF," << vc_1_ref_arg.time << ",";
+                        if (cnf_args.result.size() != 0)
                         {
                             myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
                         }
-                        else if (cnf3_args.foundSolution == true)
+                        else if (cnf3_args.result.size() != 0)
                         {
                             myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
                         }
@@ -936,7 +945,7 @@ int main()
                             myfile << -1 << std::endl;
                         }
                         myfile << Limit << ","
-                               << "VC2-REF," << VC2_REF_TIME << ",";
+                               << "VC2-REF," << vc_2_ref_arg.time << ",";
                         if (cnf_args.foundSolution == true)
                         {
                             myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
