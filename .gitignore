@@ -1,6 +1,6 @@
 minisat/
 build/
 .vscode/
-*.txt
+*t.txt
 *.csv
 main.cpp
