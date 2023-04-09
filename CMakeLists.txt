@@ -7,7 +7,7 @@ else()
   message (FATAL_ERROR "MiniSat not found. Use `git clone https://git.uwaterloo.ca/ece650-1231/minisat.git` to check it out.")
 endif()
 
-file(REMOVE ${BUILD_DIR}/example.csv)
+# file(REMOVE ${BUILD_DIR}/example.csv)
 # Copy example.csv to the build directory
 # configure_file(${SOURCE_DIR}/example.csv ${BUILD_DIR}/example.csv COPYONLY)
 # configure_file(example.csv ${CMAKE_CURRENT_BINARY_DIR}/example.csv COPYONLY)
