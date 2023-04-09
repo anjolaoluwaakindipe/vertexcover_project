@@ -1,3 +1,6 @@
 minisat/
 build/
 .vscode/
+*.txt
+*.csv
+main.cpp

@@ -330,7 +330,7 @@ void *CNF3_THREAD(void *args)
     data->foundSolution = true;
     struct timespec ts;
     clock_gettime(cid, &ts);
-    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) *1000;
+    double duration_ms = (ts.tv_sec * (double)1000 + ts.tv_nsec / (double)1000000) * 1000;
     // std::string message = "CNF3 Thread CPU time: " + std::to_string(duration_ms) + " milliseconds \n";
     // std::cout << message;
     data->time = duration_ms;
@@ -854,8 +854,8 @@ int main()
                         clock_gettime(CLOCK_REALTIME, &timeout);
                         clock_gettime(CLOCK_REALTIME, &remaining_time);
 
-                        remaining_time.tv_sec += 30;
-                        timeout.tv_sec += 30;
+                        remaining_time.tv_sec += 60;
+                        timeout.tv_sec += 60;
 
                         // pthread_join(CNF_SAT, NULL);
                         // pthread_join(CNF_3SAT, NULL);
@@ -871,7 +871,7 @@ int main()
                             cnf_args.satSolver.solver->interrupt();
                             if (cnf_args.result.size() == 0)
                             {
-                                cnf_args.time = 30000000;
+                                cnf_args.time = 60000000;
                             }
                             pthread_join(CNF_SAT, NULL);
                         }
@@ -882,7 +882,7 @@ int main()
                             cnf3_args.satSolver.solver->interrupt();
                             if (cnf3_args.result.size() == 0)
                             {
-                                cnf3_args.time = 30000000;
+                                cnf3_args.time = 60000000;
                             }
                             pthread_join(CNF_3SAT, NULL);
                         }
@@ -894,71 +894,71 @@ int main()
                         // print the output of each thread
 
                         // append result to file
-                        std::ofstream myfile("example.csv", std::ios_base::app);
-                        if (!myfile.is_open())
-                        {
-                        }
-                        myfile << Limit << ","
-                               << "CNF," << cnf_args.time << "," << -1 << std::endl;
-                        myfile << Limit << ","
-                               << "3CNF," << cnf3_args.time << "," << -1 << std::endl;
-                        myfile << Limit << ","
-                               << "VC1," << vc_1_arg.time << ",";
-                        if (cnf_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_1_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
-                        }
-                        else if (cnf3_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_1_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
-                        }
-                        else
-                        {
-                            myfile << -1 << std::endl;
-                        }
-                        myfile << Limit << ","
-                               << "VC2," << vc_2_arg.time << ",";
-                        if (cnf_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_2_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
-                        }
-                        else if (cnf3_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_2_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
-                        }
-                        else
-                        {
-                            myfile << -1 << std::endl;
-                        }
-                        myfile << Limit << ","
-                               << "VC1-REF," << vc_1_ref_arg.time << ",";
-                        if (cnf_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
-                        }
-                        else if (cnf3_args.result.size() != 0)
-                        {
-                            myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
-                        }
-                        else
-                        {
-                            myfile << -1 << std::endl;
-                        }
-                        myfile << Limit << ","
-                               << "VC2-REF," << vc_2_ref_arg.time << ",";
-                        if (cnf_args.foundSolution == true)
-                        {
-                            myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
-                        }
-                        else if (cnf3_args.foundSolution == true)
-                        {
-                            myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
-                        }
-                        else
-                        {
-                            myfile << -1 << std::endl;
-                        }
-                        myfile.close();
+                        // std::ofstream myfile("example.csv", std::ios_base::app);
+                        // if (!myfile.is_open())
+                        // {
+                        // }
+                        // myfile << Limit << ","
+                        //        << "CNF," << cnf_args.time << "," << -1 << std::endl;
+                        // myfile << Limit << ","
+                        //        << "3CNF," << cnf3_args.time << "," << -1 << std::endl;
+                        // myfile << Limit << ","
+                        //        << "VC1," << vc_1_arg.time << ",";
+                        // if (cnf_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_1_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        // }
+                        // else if (cnf3_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_1_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        // }
+                        // else
+                        // {
+                        //     myfile << -1 << std::endl;
+                        // }
+                        // myfile << Limit << ","
+                        //        << "VC2," << vc_2_arg.time << ",";
+                        // if (cnf_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_2_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        // }
+                        // else if (cnf3_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_2_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        // }
+                        // else
+                        // {
+                        //     myfile << -1 << std::endl;
+                        // }
+                        // myfile << Limit << ","
+                        //        << "VC1-REF," << vc_1_ref_arg.time << ",";
+                        // if (cnf_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        // }
+                        // else if (cnf3_args.result.size() != 0)
+                        // {
+                        //     myfile << ((double)vc_1_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        // }
+                        // else
+                        // {
+                        //     myfile << -1 << std::endl;
+                        // }
+                        // myfile << Limit << ","
+                        //        << "VC2-REF," << vc_2_ref_arg.time << ",";
+                        // if (cnf_args.foundSolution == true)
+                        // {
+                        //     myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf_args.result.size()) << std::endl;
+                        // }
+                        // else if (cnf3_args.foundSolution == true)
+                        // {
+                        //     myfile << ((double)vc_2_ref_arg.result.size()) / ((double)cnf3_args.result.size()) << std::endl;
+                        // }
+                        // else
+                        // {
+                        //     myfile << -1 << std::endl;
+                        // }
+                        // myfile.close();
 
                         // CNF PRINT
                         std::cout << "CNF-SAT-VC: ";
