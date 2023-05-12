@@ -4,7 +4,7 @@ Different algorithms and their optimizations were used in the analysis and more 
 
 ## INFORMATION BEFORE RUNNING THE PROJECT
 - This project uses the pthread library to create multiple threads thus it is intended to be ran in a UNIX-like operating system. 
-- This project is dependent on the minisat library so make sure to download it before running the project. The library can be gotten from this link
+- This project is dependent on the minisat library so make sure to download it before running the project. The library can be gotten from this [here](https://github.com/agurfinkel/minisat)
 - Graphs are intended to be inputed using the following structure:
     ```bash
         V 5
